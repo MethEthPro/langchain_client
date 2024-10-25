@@ -51,7 +51,8 @@ with st.sidebar:
     st.divider()
     
     # API Configuration
-    API_BASE_URL = st.secrets.get("API_URL", "https://langchain-01.onrender.com")
+    # Make sure the base URL doesn't end with a slash
+    API_BASE_URL = st.secrets.get("API_URL", "https://langchain-01.onrender.com").rstrip('/')
     
     if st.secrets.get("GROQ_API_KEY"):
         st.success("✅ API Configuration loaded")
@@ -103,10 +104,13 @@ if prompt := st.chat_input("Type your message here..."):
     try:
         # Show spinner while waiting for response
         with st.spinner('Thinking... 🤔'):
-            # Make API request with conversation ID
+            # Construct the complete API URL
+            api_url = f"{API_BASE_URL}/ask"  # Remove the conversation ID from the URL
+            
+            # Make API request
             response = requests.post(
-                f"{API_BASE_URL}/ask/{st.session_state.conversation_id}",
-                json={"question": prompt},
+                api_url,
+                json={"question": prompt},  # Send just the question
                 headers={
                     "Content-Type": "application/json",
                     "Accept": "application/json"
@@ -124,9 +128,10 @@ if prompt := st.chat_input("Type your message here..."):
                     {"role": "assistant", "content": result["answer"]}
                 )
                 
-                # Optional: Update the entire conversation history from the server
-                if "conversation_history" in result:
-                    st.session_state.messages = result["conversation_history"]
+                # Keep only the last 3 pairs of messages (6 messages total)
+                if len(st.session_state.messages) > 6:
+                    st.session_state.messages = st.session_state.messages[-6:]
+                    
             else:
                 st.error(f"Error: {response.status_code} - {response.text}")
                 
@@ -143,15 +148,10 @@ col1, col2 = st.columns([1, 1])
 
 with col1:
     if st.button("Clear Conversation"):
-        # Delete conversation on the server
-        try:
-            requests.delete(f"{API_BASE_URL}/conversation/{st.session_state.conversation_id}")
-            # Reset local state
-            st.session_state.conversation_id = str(uuid.uuid4())
-            st.session_state.messages = []
-            st.rerun()
-        except Exception as e:
-            st.error(f"Failed to clear conversation: {str(e)}")
+        # Reset local state only
+        st.session_state.conversation_id = str(uuid.uuid4())
+        st.session_state.messages = []
+        st.rerun()
 
 # Footer
 st.markdown("---")

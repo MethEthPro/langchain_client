@@ -11,10 +11,9 @@ st.set_page_config(
     page_title="AI Chat Assistant",
     page_icon="🤖",
     layout="wide",
-    initial_sidebar_state="expanded"
 )
 
-# Custom CSS
+# Custom CSS (same as before)
 st.markdown("""
 <style>
     .stTextInput > div > div > input {
@@ -44,20 +43,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Debug: Print the API URL being used
+API_URL = st.secrets.get("API_URL", "http://localhost:8000")
+st.sidebar.write("API URL:", API_URL)  # This will help us debug the URL
+
 # Sidebar configuration
 with st.sidebar:
     st.title("⚙️ Configuration")
     st.divider()
-    
-    # API Configuration
-    API_BASE_URL = st.secrets.get("API_URL", "https://langchain-01.onrender.com").rstrip('/')
     
     if st.secrets.get("GROQ_API_KEY"):
         st.success("✅ API Configuration loaded")
     else:
         st.warning("⚠️ API Configuration missing")
     
-    # Add a button to clear chat
     if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
@@ -94,11 +93,15 @@ if prompt := st.chat_input("Type your message here..."):
         st.markdown(prompt)
 
     try:
+        # Construct the full URL - ensure it ends with /ask/
+        full_url = f"{API_URL.rstrip('/')}/ask/"
+        st.sidebar.write("Full API URL:", full_url)  # Debug information
+        
         # Show spinner while waiting for response
         with st.spinner('Thinking... 🤔'):
             # Make API request
             response = requests.post(
-                f"{API_BASE_URL}/ask",
+                full_url,
                 json={"question": prompt},
                 headers={
                     "Content-Type": "application/json",
@@ -106,6 +109,10 @@ if prompt := st.chat_input("Type your message here..."):
                 },
                 timeout=60
             )
+            
+            # Debug information
+            st.sidebar.write("Response Status:", response.status_code)
+            st.sidebar.write("Response Headers:", dict(response.headers))
             
             if response.status_code == 200:
                 result = response.json()
@@ -117,14 +124,14 @@ if prompt := st.chat_input("Type your message here..."):
                     {"role": "assistant", "content": result["answer"]}
                 )
                 
-                # Keep only the last 3 pairs of messages (6 messages total)
+                # Keep only the last 3 pairs of messages
                 if len(st.session_state.messages) > 6:
                     st.session_state.messages = st.session_state.messages[-6:]
             else:
                 st.error(f"Error: {response.status_code} - {response.text}")
                 
     except requests.exceptions.ConnectionError:
-        st.error("❌ Failed to connect to the API. Please try again later.")
+        st.error("❌ Failed to connect to the API. Please check if the server is running and the URL is correct.")
     except requests.exceptions.Timeout:
         st.error("⏱️ Request timed out. The server took too long to respond.")
     except Exception as e:

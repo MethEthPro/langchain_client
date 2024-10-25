@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 from dotenv import load_dotenv
 import os
-import uuid
 
 # Load environment variables
 load_dotenv()
@@ -51,7 +50,6 @@ with st.sidebar:
     st.divider()
     
     # API Configuration
-    # Make sure the base URL doesn't end with a slash
     API_BASE_URL = st.secrets.get("API_URL", "https://langchain-01.onrender.com").rstrip('/')
     
     if st.secrets.get("GROQ_API_KEY"):
@@ -59,9 +57,8 @@ with st.sidebar:
     else:
         st.warning("⚠️ API Configuration missing")
     
-    # Add a button to start new conversation
-    if st.button("Start New Conversation"):
-        st.session_state.conversation_id = str(uuid.uuid4())
+    # Add a button to clear chat
+    if st.button("Clear Chat"):
         st.session_state.messages = []
         st.rerun()
     
@@ -78,14 +75,9 @@ with st.sidebar:
 st.title("🤖 AI Chat Assistant")
 st.markdown("Ask me anything and I'll help you find the answer!")
 
-# Initialize session state
-if "conversation_id" not in st.session_state:
-    st.session_state.conversation_id = str(uuid.uuid4())
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
-# Display current conversation ID
-st.caption(f"Conversation ID: {st.session_state.conversation_id}")
 
 # Display chat history
 for message in st.session_state.messages:
@@ -104,13 +96,10 @@ if prompt := st.chat_input("Type your message here..."):
     try:
         # Show spinner while waiting for response
         with st.spinner('Thinking... 🤔'):
-            # Construct the complete API URL
-            api_url = f"{API_BASE_URL}/ask"  # Remove the conversation ID from the URL
-            
             # Make API request
             response = requests.post(
-                api_url,
-                json={"question": prompt},  # Send just the question
+                f"{API_BASE_URL}/ask",
+                json={"question": prompt},
                 headers={
                     "Content-Type": "application/json",
                     "Accept": "application/json"
@@ -131,7 +120,6 @@ if prompt := st.chat_input("Type your message here..."):
                 # Keep only the last 3 pairs of messages (6 messages total)
                 if len(st.session_state.messages) > 6:
                     st.session_state.messages = st.session_state.messages[-6:]
-                    
             else:
                 st.error(f"Error: {response.status_code} - {response.text}")
                 
@@ -141,17 +129,6 @@ if prompt := st.chat_input("Type your message here..."):
         st.error("⏱️ Request timed out. The server took too long to respond.")
     except Exception as e:
         st.error(f"❌ An error occurred: {str(e)}")
-
-# Add conversation management controls
-st.markdown("---")
-col1, col2 = st.columns([1, 1])
-
-with col1:
-    if st.button("Clear Conversation"):
-        # Reset local state only
-        st.session_state.conversation_id = str(uuid.uuid4())
-        st.session_state.messages = []
-        st.rerun()
 
 # Footer
 st.markdown("---")
